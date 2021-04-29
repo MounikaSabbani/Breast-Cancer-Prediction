@@ -1,1 +1,1 @@
-Breast-Cancer-Prediction
+Data Analytics Project - Breast Cancer Prediction
