@@ -1,0 +1,374 @@
+---
+title: "DataAnalyticsProject1"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## R Markdown
+
+This is an R Markdown document. Markdown is a simple formatting syntax for authoring HTML, PDF, and MS Word documents. For more details on using R Markdown see <http://rmarkdown.rstudio.com>.
+
+When you click the **Knit** button a document will be generated that includes both content as well as the output of any embedded R code chunks within the document. You can embed an R code chunk like this:
+
+```{r cars}
+summary(cars)
+```
+
+## Including Plots
+
+You can also embed plots, for example:
+
+```{r pressure, echo=FALSE}
+plot(pressure)
+```
+
+Note that the `echo = FALSE` parameter was added to the code chunk to prevent printing of the R code that generated the plot.
+
+=========================================================================================================================================================================================
+
+```{r}
+library(dplyr)
+library(readr)
+library(tidyr)
+library(ggplot2)
+library(eeptools)
+library(pROC)
+```
+
+
+```{r}
+
+bcdata = read.csv(file = "C:/Users/Shruti/Desktop/MS/Courses/DataAnalyticssem2/proj/breast-cancer-wisconsin.data", header = FALSE)
+glimpse(bcdata)
+dim(bcdata)
+summary(bcdata)
+pairs(bcdata[-7])
+
+bcdata <- na.omit(bcdata)
+bcdata$V6[newbcdata$V6 == ""] <- NA
+bcdata$V6[newbcdata$V6 == "?"] <- NA
+bcdata <- na.omit(bcdata)
+
+bcdata$malignant = ifelse(bcdata$V11 == 4, 1, 0)
+glimpse(bcdata)
+summary(bcdata)
+
+```
+
+Pearson Correlation:
+```{r}
+cor(bcdata[-7])
+
+```
+```{r}
+lr1 <- glm(bcdata$malignant ~ bcdata$V2+bcdata$V3+bcdata$V4+bcdata$V5+bcdata$V6+bcdata$V7+bcdata$V8+bcdata$V9+bcdata$V10, data=bcdata, family = "binomial")
+summary(lr1)
+# coef(lr1)
+summary(lr1)$coefficients[,4]
+
+```
+
+```{r}
+#predict(lr1,type="response") #responce => probabilities
+
+pred1 <- ifelse(predict(lr1,type = "response") > 0.5, "malignant","benign")
+pred1[1:8]
+# Confusion Matrix Table:
+
+CM <- table(Predictglm = pred1, Malignant = bcdata$malignant)
+CM
+
+```
+```{r}
+
+#Calculating Sensitivity:
+
+sensitivity <- (CM[2,2])/sum(CM[,2])
+sensitivity
+
+#Calculating Specificity:
+
+specificity <- (CM[1,1])/sum(CM[,1])
+specificity
+
+#Calculating Accuracy:
+
+accuracy <- ((CM[1,1])+CM[2,2])/sum(CM)
+accuracy
+
+#Calculating Errors:
+
+trainingError <- 1 - accuracy
+trainingError
+
+```
+```{r}
+
+#ROC Curve:
+
+bcdata1 <- bcdata
+bcdata1$predict <- predict(lr1, type = "response")
+
+curve <- roc(malignant ~ predict, data = bcdata1)
+
+#This plot has inverse x axis as the actual x-axis is 1-specificity, not specificity.
+plot(curve)
+
+#Correct plot using legacies.axis parameter:
+plot(curve, legacy.axes = T, main="ROC Curve - LR fit Using 9 Variables of whole dataset")
+
+#we can see that the curve is closer to ideal discriminator.
+
+```
+
+
+
+
+
+Now random sampling test data from training data to check if overfitting or still works:
+
+```{r}
+set.seed(1234)
+
+#numeric vectors of row numbers
+rownames <- as.numeric(rownames(bcdata))
+
+#creating sample of rows
+
+x <- round(0.7*length((bcdata$V1)))
+x
+rowsample <- sample(rownames, 490)
+
+#test and train data (disjoint):
+traindata <- bcdata[rowsample,]
+testdata <- bcdata[(1:699)[-rowsample],]
+
+#Training Model with training data:
+
+trainlr1 <- glm(malignant ~ V2+V3+V4+V5+V6+V7+V8+V9+V10, data=traindata, family = "binomial")
+summary(trainlr1)
+
+#Testing Model with testing data:
+
+testpred1 <- ifelse(predict(trainlr1,type = "response", newdata = testdata) > 0.5, "malignant","benign")
+summary(testpred1)
+
+#Confusion Matrix:
+testCM <- table(Malignancy = testdata$malignant, prediction = testpred1)
+summary(testCM)
+testCM
+
+```
+```{r}
+
+#Calculating Sensitivity:
+
+testsensitivity <- (testCM[2,2])/sum(testCM[,2])
+testsensitivity
+
+#Calculating Specificity:
+
+testspecificity <- (testCM[1,1])/sum(testCM[,1])
+testspecificity
+
+#Calculating Accuracy:
+
+testaccuracy <- ((testCM[1,1])+testCM[2,2])/sum(testCM)
+testaccuracy
+
+#Calculating Errors:
+
+trainingError <- 1 - testaccuracy
+trainingError
+
+# Sensitivity increased from previous instance. specificity decreased and accuracy increased by a very small amount. Training error increased with the train data.
+
+```
+[1] 0.9585062
+[1] 0.9759825
+[1] 0.9699571
+[1] 0.03004292
+
+
+```{r}
+#ROC Curve:
+
+testdataroc <- testdata
+testdataroc$predict <- predict(trainlr1, type = "response", newdata = testdataroc)
+
+testcurve <- roc(malignant ~ predict, data = testdataroc)
+testcurve
+
+plot(testcurve, legacy.axes = T, main="ROC Curve - LR fit Using 9 Variables of Traindata 70%, Testdata 30%")
+
+```
+
+
+WHEN CONSIDERING ALL VARIABLES FROM V2 - V10 AS PREDICTORS, THE MODEL IS VERY GOOD.
+
+-------
+
+NOW, CONSIDERING only v2, v4 and v8 predictors from train data.
+
+```{r}
+#fitting model with only v2, v4 and v8 predictors from train data
+
+trainlr2 <- glm(malignant ~ V2+V4+V8, data=traindata, family = "binomial")
+summary(trainlr2)
+
+#Testing Model with testing data:
+
+testpred2 <- ifelse(predict(trainlr2,type = "response", newdata = testdata) > 0.5, "malignant","benign")
+summary(testpred2)
+
+#Confusion Matrix:
+testCM2 <- table(Malignancy = testdata$malignant, prediction = testpred2)
+summary(testCM2)
+testCM2
+
+
+```
+
+```{r}
+
+#Calculating Sensitivity:
+
+testsensitivity2 <- (testCM2[2,2])/sum(testCM2[,2])
+testsensitivity2
+
+#Calculating Specificity:
+
+testspecificity2 <- (testCM2[1,1])/sum(testCM2[,1])
+testspecificity2
+
+#Calculating Accuracy:
+
+testaccuracy2 <- ((testCM2[1,1])+testCM2[2,2])/sum(testCM2)
+testaccuracy2
+
+#Calculating Errors:
+
+trainingError2 <- 1 - testaccuracy2
+trainingError2
+
+# Sensitivity, specificity, accuracy and training error decreased with only 3 predictors from training data. 
+
+```
+only 3 predictors:
+[1] 0.8933333
+[1] 0.9776119
+[1] 0.9473684
+[1] 0.05263158
+
+full test/train data:
+[1] 0.9054054
+[1] 0.9777778
+[1] 0.9521531
+[1] 0.04784689
+
+full data:
+[1] 0.9585062
+[1] 0.9759825
+[1] 0.9699571
+[1] 0.03004292
+
+NOW, CONSIDERING v2, v4 , V5, V8 and v9 predictors from train data.
+
+```{r}
+#fitting model with only v2, v4 and v8 predictors from train data
+
+trainlr3 <- glm(malignant ~ V2+V4+V5+V8+V9, data=traindata, family = "binomial")
+summary(trainlr3)
+
+#Testing Model with testing data:
+
+testpred3 <- ifelse(predict(trainlr3,type = "response", newdata = testdata) > 0.5, "malignant","benign")
+summary(testpred3)
+
+#Confusion Matrix:
+testCM3 <- table(Malignancy = testdata$malignant, prediction = testpred3)
+summary(testCM3)
+testCM3
+
+
+```
+
+```{r}
+
+#Calculating Sensitivity:
+
+testsensitivity3 <- (testCM3[2,2])/sum(testCM3[,2])
+testsensitivity3
+
+#Calculating Specificity:
+
+testspecificity3 <- (testCM3[1,1])/sum(testCM3[,1])
+testspecificity3
+
+#Calculating Accuracy:
+
+testaccuracy3 <- ((testCM3[1,1])+testCM3[2,2])/sum(testCM3)
+testaccuracy3
+
+#Calculating Errors:
+
+trainingError3 <- 1 - testaccuracy3
+trainingError3
+
+# Sensitivity decreased with only 5 predictors from training data. , specificity actually increased with 5, and accuracy and training error remained same.
+
+```
+only 5 predictors:
+[1] 0.8831169
+[1] 0.9848485
+[1] 0.9473684
+[1] 0.05263158
+
+only 3 predictors:
+[1] 0.8933333
+[1] 0.9776119
+[1] 0.9473684
+[1] 0.05263158
+
+full test/train data:
+[1] 0.9054054
+[1] 0.9777778
+[1] 0.9521531
+[1] 0.04784689
+
+full data:
+[1] 0.9585062
+[1] 0.9759825
+[1] 0.9699571
+[1] 0.03004292
+
+```{r}
+
+#ROC Curve:
+
+testdataroc$predict2 <- predict(trainlr2, type = "response", newdata = testdataroc)
+
+testcurve2 <- roc(malignant ~ predict, data = testdataroc)
+testcurve2
+
+plot(testcurve2, legacy.axes = T, main="ROC Curve - LR fit Using 3 Variables of test data")
+
+```
+
+```{r}
+
+#ROC Curve:
+
+testdataroc$predict3 <- predict(trainlr3, type = "response", newdata = testdataroc)
+
+testcurve3 <- roc(malignant ~ predict, data = testdataroc)
+testcurve3
+
+plot(testcurve3, legacy.axes = T, main="ROC Curve - LR fit Using 5 Variables of test data")
+
+```
+
+
