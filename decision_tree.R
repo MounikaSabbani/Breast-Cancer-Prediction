@@ -7,14 +7,15 @@ library(pROC)
 library(MLmetrics)
 library(rpart)
 library(rpart.plot) 
-library(randomForest)
 library(varImp)
 library(gbm)
 library(caret)
 
 data <- read.table(file = "/home/mounika/Documents/IUPUI/Courses/Spring_2021/Data_Analytics/Project/Breast-Cancer-Prediction/breast-cancer-wisconsin.data", 
                    header = FALSE, sep=",", 
-                   col.names = c("ID","clump_thickness", "uniformity_size", "uniformity_shape", "marginal_adhesion", "single_epithelial_cell_size", "bare_nuclei", "bland_chromatin", "normal_nucleoli", "mitoses", "diagnosis"))
+                   col.names = c("ID","clump_thickness", "uniformity_size", "uniformity_shape", 
+                                 "marginal_adhesion", "single_epithelial_cell_size", "bare_nuclei",
+                                 "bland_chromatin", "normal_nucleoli", "mitoses", "diagnosis"))
 
 
 
@@ -36,14 +37,14 @@ data <- data[data$bare_nuclei != "?",] %>% mutate(bare_nuclei = as.integer(as.ch
 
 
 # converting the values of 2 and 4 into binary data => 0 and 1
-data <- data %>% mutate(diagnosis = ifelse(diagnosis == 2, 0, 1),
+data <- data %>% mutate(diagnosis = ifelse(diagnosis == 2, 'B', 'M'),
                         diagnosis = as.factor(diagnosis))
 summary(data)
 
 
 # plotting the graph to check how many cases are benign and malignant
 ggplot(data, aes(x = diagnosis)) +
-  geom_bar(fill = "purple") +
+  geom_bar(fill = "skyblue") +
   ggtitle("Distribution of Diagnosis in the Entire Dataset") +
   theme_minimal() +
   theme(legend.position = "none")
@@ -76,21 +77,21 @@ for(para_comb in 1:nrow(tree_parameters)){
                                                  maxdepth = tree_parameters[para_comb, "maxdepth_para"])) 
   
   pred_train_tree <- as.data.frame(predict(decision_tree, train, type='prob'))
-  AUC_train_tree <- roc(train$diagnosis, pred_train_tree$`1`, percent = TRUE, plot = TRUE)
+  AUC_train_tree <- roc(train$diagnosis, pred_train_tree$`M`, percent = TRUE, plot = TRUE, print.auc=TRUE)
   
   pred_test_tree <- as.data.frame(predict(decision_tree, test, type='prob'))
-  AUC_test_tree <- roc(test$diagnosis, pred_test_tree$`1`, percent = TRUE, plot = TRUE)
+  AUC_test_tree <- roc(test$diagnosis, pred_test_tree$`M`, percent = TRUE, plot = TRUE, print.auc=TRUE)
   
   AUC_tree[para_comb, ] <- c(round(AUC_train_tree$auc, 2), round(AUC_test_tree$auc, 2))
   AUC_train_besttree = ifelse(AUC_train_besttree > AUC_train_tree$auc, AUC_train_besttree, AUC_train_tree$auc)
   AUC_test_besttree = ifelse(AUC_test_besttree > AUC_test_tree$auc, AUC_test_besttree, AUC_test_tree$auc)
+  
 }
 
-AUC_train_tree
-
-AUC_test_tree
 
 best_decision_tree <- rpart(diagnosis ~., data = train,
                             control = rpart.control(minsplit = 11,
                                                     maxdepth = 10))
 rpart.plot(x = best_decision_tree, box.palette="RdBu", shadow.col="gray", nn=TRUE, yesno = 2)
+
+best_decision_tree
